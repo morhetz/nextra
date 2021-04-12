@@ -1,11 +1,20 @@
 import path from 'path'
-import { promises as fs } from 'fs-extra'
+import { promises as fs } from 'fs'
 import { getOptions } from 'loader-utils'
 import grayMatter from 'gray-matter'
 import slash from 'slash'
 
+import PQueue from 'p-queue'
+
 import filterRouteLocale from './filter-route-locale'
-import { getLocaleFromFilename, removeExtension, getFileName, parseJsonFile } from './utils'
+import {
+  getLocaleFromFilename,
+  removeExtension,
+  getFileName,
+  parseJsonFile,
+} from './utils'
+
+let queue = new PQueue({ concurrency: 100 })
 
 async function getPageMap(currentResourcePath) {
   const extension = /\.(mdx?|jsx?)$/
@@ -14,7 +23,9 @@ async function getPageMap(currentResourcePath) {
   let activeRoute = ''
 
   async function getFiles(dir, route) {
-    const files = await fs.readdir(dir, { withFileTypes: true })
+    const files = await queue.add(() =>
+      fs.readdir(dir, { withFileTypes: true }),
+    )
 
     // go through the directory
     const items = (
@@ -23,7 +34,7 @@ async function getPageMap(currentResourcePath) {
           const filePath = path.resolve(dir, f.name)
           const fileRoute = path.join(
             route,
-            removeExtension(f.name).replace(/^index$/, '')
+            removeExtension(f.name).replace(/^index$/, ''),
           )
 
           if (filePath === currentResourcePath) {
@@ -37,12 +48,15 @@ async function getPageMap(currentResourcePath) {
             return {
               name: f.name,
               children,
-              route: fileRoute
+              route: fileRoute,
             }
           } else if (extension.test(f.name)) {
             // MDX or MD
             if (mdxExtension.test(f.name)) {
-              const fileContents = await fs.readFile(filePath, 'utf-8')
+              console.log(3331, filePath)
+              const fileContents = await queue.add(() =>
+                fs.readFile(filePath, 'utf-8'),
+              )
               const { data } = grayMatter(fileContents)
 
               if (Object.keys(data).length) {
@@ -50,7 +64,7 @@ async function getPageMap(currentResourcePath) {
                   name: removeExtension(f.name),
                   route: fileRoute,
                   frontMatter: data,
-                  locale: getLocaleFromFilename(f.name)
+                  locale: getLocaleFromFilename(f.name),
                 }
               }
             }
@@ -58,10 +72,13 @@ async function getPageMap(currentResourcePath) {
             return {
               name: removeExtension(f.name),
               route: fileRoute,
-              locale: getLocaleFromFilename(f.name)
+              locale: getLocaleFromFilename(f.name),
             }
           } else if (metaExtension.test(f.name)) {
-            const content = await fs.readFile(filePath, 'utf-8')
+            console.log(3332, filePath)
+            const content = await queue.add(() =>
+              fs.readFile(filePath, 'utf-8'),
+            )
             const meta = parseJsonFile(content, filePath)
 
             const locale = f.name.match(metaExtension)[1]
@@ -69,10 +86,10 @@ async function getPageMap(currentResourcePath) {
             return {
               name: 'meta.json',
               meta,
-              locale
+              locale,
             }
           }
-        })
+        }),
       )
     )
       .map(item => {
@@ -87,21 +104,28 @@ async function getPageMap(currentResourcePath) {
   return [await getFiles(path.join(process.cwd(), 'pages'), '/'), activeRoute]
 }
 
-async function analyzeLocalizedEntries(currentResourcePath, defaultLocale) {	
-  const filename = getFileName(currentResourcePath)	
-  const dir = path.dirname(currentResourcePath)	
+async function analyzeLocalizedEntries(currentResourcePath, defaultLocale) {
+  const filename = getFileName(currentResourcePath)
+  const dir = path.dirname(currentResourcePath)
 
-  const filenameRe = new RegExp('^' + filename + '.[a-zA-Z-]+.(mdx?|jsx?|tsx?|json)$')	
-  const files = await fs.readdir(dir, { withFileTypes: true })	
-  
-  let hasSSR = false, hasSSG = false, defaultIndex = 0
+  const filenameRe = new RegExp(
+    '^' + filename + '.[a-zA-Z-]+.(mdx?|jsx?|tsx?|json)$',
+  )
+  const files = await queue.add(() => fs.readdir(dir, { withFileTypes: true }))
+
+  let hasSSR = false,
+    hasSSG = false,
+    defaultIndex = 0
   const filteredFiles = []
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i]
     if (!filenameRe.test(file.name)) continue
 
-    const content = await fs.readFile(path.join(dir, file.name), 'utf-8')
+    console.log(3333, path.join(dir, file.name))
+    const content = await queue.add(() =>
+      fs.readFile(path.join(dir, file.name), 'utf-8'),
+    )
     const locale = getLocaleFromFilename(file.name)
 
     // Note: this is definitely not correct, we have to use MDX tokenizer here.
@@ -113,11 +137,11 @@ async function analyzeLocalizedEntries(currentResourcePath, defaultLocale) {
 
     if (locale === defaultLocale) defaultIndex = filteredFiles.length
 
-    filteredFiles.push({	
-      name: file.name,	
+    filteredFiles.push({
+      name: file.name,
       locale,
       ssr: exportSSR,
-      ssg: exportSSG
+      ssg: exportSSG,
     })
   }
 
@@ -125,7 +149,7 @@ async function analyzeLocalizedEntries(currentResourcePath, defaultLocale) {
     ssr: hasSSR,
     ssg: hasSSG,
     files: filteredFiles,
-    defaultIndex
+    defaultIndex,
   }
 }
 
@@ -170,53 +194,64 @@ export default async function (source) {
   const filename = resourcePath.slice(resourcePath.lastIndexOf('/') + 1)
   const notI18nEntry = resourceQuery.includes('nextra-raw')
 
-  if (locales && !notI18nEntry) {	
+  if (locales && !notI18nEntry) {
     // We need to handle the locale router here
-    const {
-      files,
-      defaultIndex,
-      ssr,
-      ssg
-    } = await analyzeLocalizedEntries(resourcePath, defaultLocale)
+    const { files, defaultIndex, ssr, ssg } = await analyzeLocalizedEntries(
+      resourcePath,
+      defaultLocale,
+    )
 
     const i18nEntry = `	
 import { useRouter } from 'next/router'	
-${files	
-  .map((file, index) => 
-    `import Page_${index}${
-      file.ssg || file.ssr ? `, { ${file.ssg ? 'getStaticProps' : 'getServerSideProps'} as page_data_${index} }` : ''
-    } from './${file.name}?nextra-raw'`	
-  )	
+${files
+  .map(
+    (file, index) =>
+      `import Page_${index}${
+        file.ssg || file.ssr
+          ? `, { ${
+              file.ssg ? 'getStaticProps' : 'getServerSideProps'
+            } as page_data_${index} }`
+          : ''
+      } from './${file.name}?nextra-raw'`,
+  )
   .join('\n')}
 
 export default function I18NPage (props) {	
   const { locale } = useRouter()	
   ${files
-    .map((file, index) => 
-      `if (locale === '${file.locale}') {
+    .map(
+      (file, index) =>
+        `if (locale === '${file.locale}') {
     return <Page_${index} {...props}/>
-  } else `
-    )	
+  } else `,
+    )
     .join('')} {	
     return <Page_${defaultIndex} {...props}/>	
   }
 }
 
-${ssg || ssr ? `export async function ${ssg ? 'getStaticProps' : 'getServerSideProps'} (context) {
+${
+  ssg || ssr
+    ? `export async function ${
+        ssg ? 'getStaticProps' : 'getServerSideProps'
+      } (context) {
   const locale = context.locale
   ${files
-    .map((file, index) => 
-      `if (locale === '${file.locale}' && ${ssg ? file.ssg : file.ssr}) {
+    .map(
+      (file, index) =>
+        `if (locale === '${file.locale}' && ${ssg ? file.ssg : file.ssr}) {
     return page_data_${index}(context)
-  } else `
-    )	
+  } else `,
+    )
     .join('')} {	
     return { props: {} }
   }
-}` : ''}
+}`
+    : ''
+}
 `
 
-    return callback(null, i18nEntry)	
+    return callback(null, i18nEntry)
   }
 
   if (locales) {
