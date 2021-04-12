@@ -32,14 +32,14 @@ export default (theme, themeConfig) => (nextConfig = {}) => {
           use: [
             options.defaultLoaders.babel,
             {
-              loader: 'nextra/react17-loader',
+              loader: '@dextcloud/nextra/react17-loader',
             },
             {
               loader: '@mdx-js/loader',
               options: nextraConfig.mdxOptions
             },
             {
-              loader: 'nextra/loader',
+              loader: '@dextcloud/nextra/loader',
               options: { theme: nextraConfig.theme, themeConfig: nextraConfig.themeConfig, locales, defaultLocale }
             }
           ]
