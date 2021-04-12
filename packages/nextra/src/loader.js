@@ -228,7 +228,7 @@ ${ssg || ssr ? `export async function ${ssg ? 'getStaticProps' : 'getServerSideP
 
   const prefix = `
 import withLayout from '${layout}'
-import { withSSG } from 'nextra/ssg'
+import { withSSG } from '@dextcloud/nextra/ssg'
 ${layoutConfig ? `import layoutConfig from '${layoutConfig}'` : ''}
 
 `
