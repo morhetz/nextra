@@ -53,7 +53,6 @@ async function getPageMap(currentResourcePath) {
           } else if (extension.test(f.name)) {
             // MDX or MD
             if (mdxExtension.test(f.name)) {
-              console.log(3331, filePath)
               const fileContents = await queue.add(() =>
                 fs.readFile(filePath, 'utf-8'),
               )
@@ -75,7 +74,6 @@ async function getPageMap(currentResourcePath) {
               locale: getLocaleFromFilename(f.name),
             }
           } else if (metaExtension.test(f.name)) {
-            console.log(3332, filePath)
             const content = await queue.add(() =>
               fs.readFile(filePath, 'utf-8'),
             )
@@ -122,7 +120,6 @@ async function analyzeLocalizedEntries(currentResourcePath, defaultLocale) {
     const file = files[i]
     if (!filenameRe.test(file.name)) continue
 
-    console.log(3333, path.join(dir, file.name))
     const content = await queue.add(() =>
       fs.readFile(path.join(dir, file.name), 'utf-8'),
     )

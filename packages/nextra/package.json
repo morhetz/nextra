@@ -1,6 +1,6 @@
 {
   "name": "@dextcloud/nextra",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "Next.js and MDX based site generator.",
   "main": "index.js",
   "files": [
