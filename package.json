@@ -1,5 +1,5 @@
 {
-  "name": "nextra-monorepo",
+  "name": "@dextcloud/nextra-monorepo",
   "private": true,
   "workspaces": [
     "packages/nextra",
