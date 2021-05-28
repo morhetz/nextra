@@ -11,65 +11,75 @@ import { useActiveAnchorSet } from './active-anchor'
 
 const THEME = {
   plain: {
-    backgroundColor: 'transparent'
+    backgroundColor: 'transparent',
   },
   styles: [
     {
       types: ['keyword', 'builtin'],
       style: {
         color: '#ff0078',
-        fontWeight: 'bold'
-      }
+        fontWeight: 'bold',
+      },
     },
     {
       types: ['comment'],
       style: {
         color: '#999',
-        fontStyle: 'italic'
-      }
+        fontStyle: 'italic',
+      },
     },
     {
       types: ['variable', 'language-javascript'],
       style: {
-        color: '#0076ff'
-      }
+        color: '#0076ff',
+      },
     },
     {
       types: ['attr-name'],
       style: {
         color: '#d9931e',
-        fontStyle: 'normal'
-      }
+        fontStyle: 'normal',
+      },
     },
     {
       types: ['boolean', 'regex'],
       style: {
-        color: '#d9931e'
-      }
-    }
-  ]
+        color: '#d9931e',
+      },
+    },
+  ],
 }
 
 // Anchor links
 
-const HeaderLink = ({ tag: Tag, children, slugger, withObserver, ...props }) => {
+const HeaderLink = ({
+  tag: Tag,
+  children,
+  slugger,
+  withObserver,
+  ...props
+}) => {
   const setActiveAnchor = useActiveAnchorSet()
 
   const slug = slugger.slug(innerText(children) || '')
   const anchor = <span className="subheading-anchor" id={slug} />
-  const anchorWithObserver = withObserver
-    ? <Observer
-        onChange={e => {
-          // if the element is above the 70% of height of the viewport
-          // we don't use e.isIntersecting
-          const isAboveViewport = e.boundingClientRect.y + e.boundingClientRect.height <= e.rootBounds.y + e.rootBounds.height
-          setActiveAnchor(f => ({ ...f, [slug]: isAboveViewport }))
-        }}
-        rootMargin="1000% 0% -70%"
-        threshold={[0, 1]}
-        children={anchor}
-      />
-    : anchor;
+  const anchorWithObserver = withObserver ? (
+    <Observer
+      onChange={e => {
+        // if the element is above the 70% of height of the viewport
+        // we don't use e.isIntersecting
+        const isAboveViewport =
+          e.boundingClientRect.y + e.boundingClientRect.height <=
+          e.rootBounds.y + e.rootBounds.height
+        setActiveAnchor(f => ({ ...f, [slug]: isAboveViewport }))
+      }}
+      rootMargin="1000% 0% -70%"
+      threshold={[0, 1]}
+      children={anchor}
+    />
+  ) : (
+    anchor
+  )
 
   return (
     <Tag {...props}>
@@ -125,17 +135,18 @@ const H6 = ({ slugger }) => ({ children, ...props }) => {
 }
 
 const A = ({ children, ...props }) => {
-  const isExternal = props.href && props.href.startsWith('https://')
+  let { href, ...restProps } = props
+  let isExternal = href && href.startsWith('https://')
   if (isExternal) {
     return (
-      <a target="_blank" {...props}>
+      <a target="_blank" href={href} {...restProps}>
         {children}
       </a>
     )
   }
   return (
-    <Link href={props.href}>
-      <a {...props}>{children}</a>
+    <Link href={href}>
+      <a {...restProps}>{children}</a>
     </Link>
   )
 }
@@ -165,7 +176,7 @@ const Code = ({ children, className, highlight, ...props }) => {
                   ? {
                       background: 'var(--c-highlight)',
                       margin: '0 -1rem',
-                      padding: '0 1rem'
+                      padding: '0 1rem',
                     }
                   : null
               }
@@ -188,7 +199,7 @@ const getComponents = args => ({
   h5: H5(args),
   h6: H6(args),
   a: A,
-  code: Code
+  code: Code,
 })
 
 export default ({ children }) => {
